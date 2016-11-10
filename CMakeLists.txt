@@ -114,31 +114,32 @@ catkin_package(
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
-# include_directories(include)
+include_directories(include)
 include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 include_directories(${CURSES_INCLUDE_DIR})
 
 ## Declare a C++ library
-# add_library(roslog
-#   src/${PROJECT_NAME}/roslog.cpp
-# )
+add_library(roslog
+  src/node_tree.cpp
+)
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
 ## either from message generation or dynamic reconfigure
-# add_dependencies(roslog ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(roslog ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Declare a C++ executable
-add_executable(roslog src/roslog.cpp)
+add_executable(roslog_bin src/roslog.cpp)
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above
-add_dependencies(roslog ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(roslog_bin ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(roslog
+target_link_libraries(roslog_bin
+  roslog
   ${catkin_LIBRARIES}
   ${CURSES_LIBRARIES}
 )
@@ -170,11 +171,11 @@ target_link_libraries(log_test
 # )
 
 ## Mark executables and/or libraries for installation
-install(TARGETS roslog
+# install(TARGETS roslog
 #   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 #   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
+#   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+# )
 
 ## Mark cpp header files for installation
 # install(DIRECTORY include/${PROJECT_NAME}/
@@ -195,10 +196,13 @@ install(TARGETS roslog
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_roslog.cpp)
-# if(TARGET ${PROJECT_NAME}-test)
-#   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
-# endif()
+catkin_add_gtest(${PROJECT_NAME}-node_tree-test src/test/test_node_tree.cpp)
+if(TARGET ${PROJECT_NAME}-node_tree-test)
+  target_link_libraries(${PROJECT_NAME}-node_tree-test
+    roslog
+    ${catkin_LIBRARIES}
+  )
+endif()
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)

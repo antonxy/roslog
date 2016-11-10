@@ -8,6 +8,8 @@
 
 #include <ncurses.h>
 
+#include <roslog/node_tree.h>
+
 enum class State {
   LOG,
   NODES
@@ -18,10 +20,9 @@ std::deque<rosgraph_msgs::Log::ConstPtr> log_msgs;
 size_t log_top_index = 0;
 bool log_list_autoscroll = true;
 
-std::vector<std::string> node_names;
-size_t nodes_list_selected_index = 0;
-
 State state = State::LOG;
+
+node_tree::Tree nodeTree;
 
 void init_colors() {
     start_color();
@@ -70,13 +71,7 @@ void nodes_list_draw() {
   if (state != State::NODES) return;
 
   werase(log_window);
-  for (size_t i = 0; i < node_names.size(); ++i) {
-    if (i >= 0 && i < LINES) {
-      if (i == nodes_list_selected_index) wattron(log_window, A_REVERSE);
-      mvwaddstr(log_window, i, 0, node_names[i].substr(0, COLS).c_str());
-      wattroff(log_window, A_REVERSE);
-    }
-  }
+  nodeTree.drawCurses(log_window);
   wrefresh(log_window);
 }
 
@@ -114,7 +109,9 @@ int main(int argc, char** argv) {
     ros::NodeHandle nh;
     ros::Subscriber rosout_agg_sub = nh.subscribe("/rosout_agg", 100, rosout_cb);
 
-    ros::master::getNodes(node_names);
+    std::vector<std::string> nodeNames;
+    ros::master::getNodes(nodeNames);
+    nodeTree.update(nodeNames);
 
     initscr();
     raw();
@@ -159,20 +156,20 @@ int main(int argc, char** argv) {
           }
         } else if (state == State::NODES) {
           if (ch == KEY_UP || ch == 'k') {
-            nodes_list_selected_index = std::max(size_t(0), nodes_list_selected_index - 1);
+            nodeTree.moveSelection(-1);
           }
           if (ch == KEY_PPAGE) {
-            nodes_list_selected_index = std::max(size_t(0), nodes_list_selected_index - LINES / 2);
+            nodeTree.moveSelection(-LINES / 2);
           }
           if (ch == KEY_DOWN || ch == 'j') {
-            nodes_list_selected_index = std::min(node_names.size() - 1, nodes_list_selected_index + 1);
+            nodeTree.moveSelection(1);
           }
           if (ch == KEY_NPAGE) {
-            nodes_list_selected_index = std::min(node_names.size() - 1, nodes_list_selected_index + LINES / 2);
+            nodeTree.moveSelection(LINES / 2);
           }
           if (ch >= '1' && ch <= '5') {
             uint8_t level = 1 << (ch - '1'); //1,2,4,8,16
-            set_logger_level(node_names[nodes_list_selected_index], int_level_to_string(level));
+            set_logger_level(nodeTree.selected->getFullName(), int_level_to_string(level));
           }
         }
         if (ch == 'n') {
