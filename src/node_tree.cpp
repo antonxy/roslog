@@ -36,7 +36,11 @@ void node_tree::Tree::update(std::vector<std::string> node_names)
     for (size_t i = 0; i < name_parts.size(); ++i) {
       Namespace* child = current_namespace->getChildByName(name_parts[i]);
       if (child == nullptr) {
-        child = new Namespace;
+        if (i == name_parts.size() - 1) {
+          child = new Node;
+        } else {
+          child = new Namespace;
+        }
         child->name = name_parts[i];
         child->parent = current_namespace;
         current_namespace->children.push_back(child);
@@ -69,7 +73,11 @@ unsigned int drawCursesN(WINDOW* window, node_tree::Tree* tree, node_tree::Names
     if (ns == tree->selected) {
       wattron(window, A_REVERSE);
     }
-    mvwaddstr(window, line, level, (ns->name + "  ").c_str());
+    std::string addon = "  ";
+    if (node_tree::Node* n = dynamic_cast<node_tree::Node*>(ns)) {
+      addon = " (N)";
+    }
+    mvwaddstr(window, line, level, (ns->name + addon).c_str());
     wattroff(window, A_REVERSE);
   }
   unsigned int linesDrawn = 1;
@@ -181,4 +189,14 @@ std::string node_tree::Namespace::getFullName()
     }
   }
   return name;
+}
+
+void node_tree::Namespace::doForeachChildNode(std::function<void (node_tree::Node *)> fun)
+{
+  if (Node* node = dynamic_cast<Node*>(this)) {
+    fun(node);
+  }
+  for (Namespace* child : children) {
+    child->doForeachChildNode(fun);
+  }
 }

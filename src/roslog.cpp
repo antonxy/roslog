@@ -91,15 +91,17 @@ std::string int_level_to_string(uint8_t level) {
   if (level == 16) return "fatal";
 }
 
-void set_logger_level(std::string node, std::string level) {
-  roscpp::SetLoggerLevel msg;
-  msg.request.logger = "ros";
-  msg.request.level = level;
-  if (ros::service::call(node + "/set_logger_level", msg)) {
+void set_logger_level(node_tree::Namespace* ns, std::string level) {
+  ns->doForeachChildNode([level](node_tree::Node* n){
+    roscpp::SetLoggerLevel msg;
+    msg.request.logger = "ros";
+    msg.request.level = level;
+    if (ros::service::call(n->getFullName() + "/set_logger_level", msg)) {
 
-  } else {
+    } else {
 
-  }
+    }
+  });
 }
 
 
@@ -169,7 +171,7 @@ int main(int argc, char** argv) {
           }
           if (ch >= '1' && ch <= '5') {
             uint8_t level = 1 << (ch - '1'); //1,2,4,8,16
-            set_logger_level(nodeTree.selected->getFullName(), int_level_to_string(level));
+            set_logger_level(nodeTree.selected, int_level_to_string(level));
           }
         }
         if (ch == 'n') {

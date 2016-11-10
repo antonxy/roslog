@@ -2,6 +2,8 @@
 #define ROSLOG_NODE_TREE
 
 #include <string>
+#include <functional>
+
 #include <ros/names.h>
 
 #include <ncurses.h>
@@ -10,8 +12,12 @@ namespace node_tree {
 
 std::vector<std::string> splitNodeName(std::string name);
 
+class Node;
+
 class Namespace {
 public:
+  virtual ~Namespace() {}
+
   std::vector<Namespace*> children;
   Namespace* parent = nullptr;
 
@@ -20,6 +26,7 @@ public:
   Namespace* getChildByName(std::string name);
   size_t getIndexOfChild(Namespace* child);
   std::string getFullName();
+  void doForeachChildNode(std::function<void(Node*)> fun);
 };
 
 class Node : public Namespace {
