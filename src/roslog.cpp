@@ -91,7 +91,7 @@ std::string int_level_to_string(uint8_t level) {
   if (level == 16) return "fatal";
 }
 
-void set_logger_level(node_tree::Namespace* ns, std::string level) {
+void set_logger_level(node_tree::TreeNode* ns, std::string level) {
   ns->doForeachChildNode([level](node_tree::Node* n){
     roscpp::SetLoggerLevel msg;
     msg.request.logger = "ros";
@@ -104,6 +104,13 @@ void set_logger_level(node_tree::Namespace* ns, std::string level) {
   });
 }
 
+void updateNodeTree(const ros::TimerEvent& event) {
+  std::vector<std::string> nodeNames;
+  ros::master::getNodes(nodeNames);
+  nodeTree.update(nodeNames);
+  nodes_list_draw();
+}
+
 
 int main(int argc, char** argv) {
     ros::init(argc, argv, "roslog", ros::init_options::AnonymousName);
@@ -111,9 +118,7 @@ int main(int argc, char** argv) {
     ros::NodeHandle nh;
     ros::Subscriber rosout_agg_sub = nh.subscribe("/rosout_agg", 100, rosout_cb);
 
-    std::vector<std::string> nodeNames;
-    ros::master::getNodes(nodeNames);
-    nodeTree.update(nodeNames);
+    ros::Timer node_update_timer = nh.createTimer(ros::Duration(2.0), updateNodeTree);
 
     initscr();
     raw();

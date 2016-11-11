@@ -33,31 +33,41 @@ void node_tree::Tree::update(std::vector<std::string> node_names)
     std::vector<std::string> name_parts = splitNodeName(name);
 
     Namespace* current_namespace = &root;
-    for (size_t i = 0; i < name_parts.size(); ++i) {
-      Namespace* child = current_namespace->getChildByName(name_parts[i]);
+    for (size_t i = 0; i < name_parts.size() - 1; ++i) {
+      Namespace* child = current_namespace->getChildByNameAndType<Namespace>(name_parts[i]);
       if (child == nullptr) {
-        if (i == name_parts.size() - 1) {
-          child = new Node;
-        } else {
-          child = new Namespace;
-        }
+        child = new Namespace;
         child->name = name_parts[i];
         child->parent = current_namespace;
         current_namespace->children.push_back(child);
       }
       current_namespace = child;
     }
+
+    Node* node = current_namespace->getChildByNameAndType<Node>(name_parts.back());
+    if (node == nullptr) {
+      node = new Node;
+      node->name = name_parts.back();
+      node->parent = current_namespace;
+      current_namespace->children.push_back(node);
+    }
+
   }
+
+  //Remove nodes not seen again
+
 }
 
 namespace {
-void debugPrintN(node_tree::Namespace* ns, unsigned int level) {
+void debugPrintN(node_tree::TreeNode* node, unsigned int level) {
   for (unsigned int i = 0; i < level; ++i) {
     std::cout << "  ";
   }
-  std::cout << ns->name << std::endl;
-  for (node_tree::Namespace* child : ns->children) {
-    debugPrintN(child, level + 1);
+  std::cout << node->name << std::endl;
+  if (node_tree::Namespace* ns = dynamic_cast<node_tree::Namespace*>(node)) {
+    for (node_tree::TreeNode* child : ns->children) {
+      debugPrintN(child, level + 1);
+    }
   }
 }
 }
@@ -68,21 +78,23 @@ void node_tree::Tree::debugPrint()
 }
 
 namespace {
-unsigned int drawCursesN(WINDOW* window, node_tree::Tree* tree, node_tree::Namespace* ns, unsigned int level, unsigned int line) {
+unsigned int drawCursesN(WINDOW* window, node_tree::Tree* tree, node_tree::TreeNode* t, unsigned int level, unsigned int line) {
   if (line < LINES) {
-    if (ns == tree->selected) {
+    if (t == tree->selected) {
       wattron(window, A_REVERSE);
     }
     std::string addon = "  ";
-    if (node_tree::Node* n = dynamic_cast<node_tree::Node*>(ns)) {
+    if (node_tree::Node* node = dynamic_cast<node_tree::Node*>(t)) {
       addon = " (N)";
     }
-    mvwaddstr(window, line, level, (ns->name + addon).c_str());
+    mvwaddstr(window, line, level, (t->name + addon).c_str());
     wattroff(window, A_REVERSE);
   }
   unsigned int linesDrawn = 1;
-  for (node_tree::Namespace* sub_ns : ns->children) {
-    linesDrawn += drawCursesN(window, tree, sub_ns, level + 1, line + linesDrawn);
+  if (node_tree::Namespace* ns = dynamic_cast<node_tree::Namespace*>(t)) {
+    for (node_tree::TreeNode* sub_ns : ns->children) {
+      linesDrawn += drawCursesN(window, tree, sub_ns, level + 1, line + linesDrawn);
+    }
   }
   return linesDrawn;
 }
@@ -96,12 +108,13 @@ void node_tree::Tree::drawCurses(WINDOW *window)
 void node_tree::Tree::moveSelection(int offset)
 {
   while (offset > 0) {
-    if (selected->children.size() > 0) {
-      selected = selected->children[0];
+    Namespace* selected_ns = dynamic_cast<Namespace*>(selected);
+    if (selected_ns && selected_ns->children.size() > 0) {
+      selected = selected_ns->children[0];
     } else {
       //selected -> parent -> child
       Namespace* parent = selected->parent;
-      Namespace* me = selected;
+      TreeNode* me = selected;
       while (true) {
         size_t my_idx = parent->getIndexOfChild(me);
         if (my_idx < parent->children.size() - 1) {
@@ -127,12 +140,13 @@ void node_tree::Tree::moveSelection(int offset)
     size_t my_idx = selected->parent->getIndexOfChild(selected);
     if (my_idx > 0) {
       //selected -> parent -> child
-      Namespace* sibling_above = selected->parent->children[my_idx - 1];
+      TreeNode* sibling_above = selected->parent->children[my_idx - 1];
       //Find last transitive child of sibling_above
-      Namespace* node_above = sibling_above;
+      TreeNode* node_above = sibling_above;
       while(true) {
-        if (node_above->children.size() > 0) {
-          node_above = node_above->children.back();
+        Namespace* ns_above = dynamic_cast<Namespace*>(node_above);
+        if (ns_above && ns_above->children.size() > 0) {
+          node_above = ns_above->children.back();
         } else {
           break;
         }
@@ -155,18 +169,7 @@ std::vector<std::string> node_tree::splitNodeName(std::string name)
   return split(clean_name.substr(1), '/');
 }
 
-
-node_tree::Namespace *node_tree::Namespace::getChildByName(std::string name)
-{
-  for (Namespace* child : children) {
-    if (child->name == name) {
-      return child;
-    }
-  }
-  return nullptr;
-}
-
-size_t node_tree::Namespace::getIndexOfChild(node_tree::Namespace *child)
+size_t node_tree::Namespace::getIndexOfChild(node_tree::TreeNode *child)
 {
   for (size_t i = 0; i < children.size(); ++i) {
     if (children[i] == child) {
@@ -177,10 +180,10 @@ size_t node_tree::Namespace::getIndexOfChild(node_tree::Namespace *child)
   return std::numeric_limits<size_t>::max();
 }
 
-std::string node_tree::Namespace::getFullName()
+std::string node_tree::TreeNode::getFullName()
 {
   std::string name = "";
-  Namespace* ns = this;
+  TreeNode* ns = this;
   while(true) {
     name = ns->name + "/" + name;
     ns = ns->parent;
@@ -191,12 +194,15 @@ std::string node_tree::Namespace::getFullName()
   return name;
 }
 
-void node_tree::Namespace::doForeachChildNode(std::function<void (node_tree::Node *)> fun)
+void node_tree::TreeNode::doForeachChildNode(std::function<void (node_tree::Node *)> fun)
 {
   if (Node* node = dynamic_cast<Node*>(this)) {
     fun(node);
-  }
-  for (Namespace* child : children) {
-    child->doForeachChildNode(fun);
+  } else if (Namespace* ns = dynamic_cast<Namespace*>(this)) {
+    for (TreeNode* child : ns->children) {
+      child->doForeachChildNode(fun);
+    }
+  } else {
+    ROS_FATAL("WUT? treenode is neither node nor namespace?");
   }
 }

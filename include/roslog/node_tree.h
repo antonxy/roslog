@@ -13,23 +13,38 @@ namespace node_tree {
 std::vector<std::string> splitNodeName(std::string name);
 
 class Node;
+class Namespace;
 
-class Namespace {
+class TreeNode {
 public:
-  virtual ~Namespace() {}
-
-  std::vector<Namespace*> children;
+  virtual ~TreeNode() {}
   Namespace* parent = nullptr;
 
   std::string name;
-
-  Namespace* getChildByName(std::string name);
-  size_t getIndexOfChild(Namespace* child);
   std::string getFullName();
   void doForeachChildNode(std::function<void(Node*)> fun);
 };
 
-class Node : public Namespace {
+class Namespace : public TreeNode {
+public:
+
+  std::vector<TreeNode*> children;
+
+  template<class T>
+  T* getChildByNameAndType(std::string name) {
+    for (TreeNode* child : children) {
+      T* t_child = dynamic_cast<T*>(child);
+      if (t_child && t_child->name == name) {
+        return t_child;
+      }
+    }
+    return nullptr;
+  }
+
+  size_t getIndexOfChild(TreeNode* child);
+};
+
+class Node : public TreeNode {
 public:
 };
 
@@ -38,7 +53,7 @@ public:
   Tree();
 
   Namespace root;
-  Namespace* selected;
+  TreeNode* selected;
   void update(std::vector<std::string> node_names);
   void debugPrint();
   void drawCurses(WINDOW* window);
